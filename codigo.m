@@ -377,30 +377,59 @@ fprintf('ITAE       | %8.4f  | %8.4f  | %.2fx\n', ITAE_pid, ITAE_mpc, ITAE_mpc/I
 fprintf('==============================================\n');
 
 %% =========================================================================
-%% 8. ESPECTROGRAMAS
+%% 8. ESPECTROGRAMAS (Cálculo Manual - Sem Toolbox)
 %% =========================================================================
-% Nota: Requer Signal Processing Toolbox. Se falhar, comente esta seção.
-fprintf('8. Gerando Espectrogramas...\n');
+fprintf('8. Gerando Espectrogramas (Método Manual STFT)...\n');
 
-try
-    window_size = 64;
-    overlap = 56;
-    nfft = 128;
-    fs_sample = 1/Ts;
+% Parâmetros da STFT
+n_win = 64;             % Tamanho da janela
+n_overlap = 56;         % Sobreposição
+n_fft = 128;            % Pontos da FFT
+fs = 1/Ts;              % Frequência de amostragem (10 Hz)
+hop_size = n_win - n_overlap;
 
-    % PID
-    figure('Name', 'Espectrograma PID', 'Color', 'w');
-    spectrogram(u_pid, window_size, overlap, nfft, fs_sample, 'yaxis');
-    title('Espectrograma do sinal de controle PID');
-    saveas(gcf, 'figs/11_spectrogram_pid.png');
+% Função de Janela (Hamming feita na mão)
+% w(n) = 0.54 - 0.46 * cos(2*pi*n / (N-1))
+win_func = 0.54 - 0.46 * cos(2*pi*(0:n_win-1)' / (n_win-1));
 
-    % MPC
-    figure('Name', 'Espectrograma MPC', 'Color', 'w');
-    spectrogram(u_mpc, window_size, overlap, nfft, fs_sample, 'yaxis');
-    title('Espectrograma do sinal de controle MPC');
-    saveas(gcf, 'figs/12_spectrogram_mpc.png');
-catch
-    warning('Função spectrogram falhou (Signal Processing Toolbox ausente). Pulando esta etapa.');
-end
+% --- Função Auxiliar para Calcular STFT ---
+calc_stft = @(signal) ...
+    cell2mat(arrayfun(@(k) abs(fft(signal(k:k+n_win-1) .* win_func', n_fft)).^2, ...
+    1:hop_size:(length(signal)-n_win), 'UniformOutput', false));
+
+% --- 1. Espectrograma PID ---
+S_pid = calc_stft(u_pid);
+S_pid = S_pid(1:n_fft/2+1, :); % Pegar apenas frequências positivas
+S_pid_db = 10*log10(S_pid + eps); % Converter para dB
+
+% Eixos de tempo e frequência
+t_spec = (0:size(S_pid, 2)-1) * hop_size * Ts;
+f_spec = (0:n_fft/2) * fs / n_fft;
+
+figure('Name', 'Espectrograma PID', 'Color', 'w');
+imagesc(t_spec, f_spec, S_pid_db);
+axis xy; % Frequência 0 embaixo
+colormap('jet'); colorbar;
+xlabel('Tempo (s)'); ylabel('Frequência (Hz)');
+title('Espectrograma do Sinal de Controle (PID)');
+% Remove a barra de ferramentas chata se existir
+try a = gca; a.Toolbar.Visible = 'off'; catch; end 
+saveas(gcf, 'figs/11_spectrogram_pid.png');
+
+% --- 2. Espectrograma MPC ---
+S_mpc = calc_stft(u_mpc);
+S_mpc = S_mpc(1:n_fft/2+1, :);
+S_mpc_db = 10*log10(S_mpc + eps);
+
+figure('Name', 'Espectrograma MPC', 'Color', 'w');
+imagesc(t_spec, f_spec, S_mpc_db);
+axis xy;
+colormap('jet'); colorbar;
+xlabel('Tempo (s)'); ylabel('Frequência (Hz)');
+title('Espectrograma do Sinal de Controle (MPC)');
+try a = gca; a.Toolbar.Visible = 'off'; catch; end
+saveas(gcf, 'figs/12_spectrogram_mpc.png');
+
+fprintf('\nSIMULAÇÃO FINALIZADA. Verifique a pasta "figs/".\n');
 
 fprintf('\nSIMULAÇÃO FINALIZADA. Verifique a pasta "figs/".\n');
