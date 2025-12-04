@@ -385,34 +385,35 @@ fprintf('8. Gerando Espectrogramas (Método Manual STFT)...\n');
 n_win = 64;             % Tamanho da janela
 n_overlap = 56;         % Sobreposição
 n_fft = 128;            % Pontos da FFT
-fs = 1/Ts;              % Frequência de amostragem (10 Hz)
+fs_sample = 1/Ts;       % Frequência de amostragem (10 Hz)
 hop_size = n_win - n_overlap;
 
-% Função de Janela (Hamming feita na mão)
-% w(n) = 0.54 - 0.46 * cos(2*pi*n / (N-1))
+% Função de Janela (Hamming feita na mão) - Vetor COLUNA
 win_func = 0.54 - 0.46 * cos(2*pi*(0:n_win-1)' / (n_win-1));
 
-% --- Função Auxiliar para Calcular STFT ---
+% --- Função Auxiliar para Calcular STFT (CORRIGIDA) ---
+% A correção está no (fft(...).') -> Transpõe para coluna antes de juntar
 calc_stft = @(signal) ...
-    cell2mat(arrayfun(@(k) abs(fft(signal(k:k+n_win-1) .* win_func', n_fft)).^2, ...
+    cell2mat(arrayfun(@(k) abs(fft(signal(k:k+n_win-1) .* win_func', n_fft).').^2, ...
     1:hop_size:(length(signal)-n_win), 'UniformOutput', false));
 
 % --- 1. Espectrograma PID ---
-S_pid = calc_stft(u_pid);
-S_pid = S_pid(1:n_fft/2+1, :); % Pegar apenas frequências positivas
+S_pid = calc_stft(u_pid); % Agora retorna matriz (Frequencia x Tempo)
+S_pid = S_pid(1:n_fft/2+1, :); % Pegar apenas frequências positivas (0 a fs/2)
 S_pid_db = 10*log10(S_pid + eps); % Converter para dB
 
-% Eixos de tempo e frequência
+% Eixos de tempo e frequência para plotagem
 t_spec = (0:size(S_pid, 2)-1) * hop_size * Ts;
-f_spec = (0:n_fft/2) * fs / n_fft;
+f_spec = (0:n_fft/2) * fs_sample / n_fft;
 
 figure('Name', 'Espectrograma PID', 'Color', 'w');
 imagesc(t_spec, f_spec, S_pid_db);
-axis xy; % Frequência 0 embaixo
-colormap('jet'); colorbar;
-xlabel('Tempo (s)'); ylabel('Frequência (Hz)');
+axis xy; % Coloca a frequência 0 na parte inferior
+colormap('jet'); 
+colorbar;
+xlabel('Tempo (s)'); 
+ylabel('Frequência (Hz)');
 title('Espectrograma do Sinal de Controle (PID)');
-% Remove a barra de ferramentas chata se existir
 try a = gca; a.Toolbar.Visible = 'off'; catch; end 
 saveas(gcf, 'figs/11_spectrogram_pid.png');
 
@@ -424,12 +425,12 @@ S_mpc_db = 10*log10(S_mpc + eps);
 figure('Name', 'Espectrograma MPC', 'Color', 'w');
 imagesc(t_spec, f_spec, S_mpc_db);
 axis xy;
-colormap('jet'); colorbar;
-xlabel('Tempo (s)'); ylabel('Frequência (Hz)');
+colormap('jet'); 
+colorbar;
+xlabel('Tempo (s)'); 
+ylabel('Frequência (Hz)');
 title('Espectrograma do Sinal de Controle (MPC)');
 try a = gca; a.Toolbar.Visible = 'off'; catch; end
 saveas(gcf, 'figs/12_spectrogram_mpc.png');
-
-fprintf('\nSIMULAÇÃO FINALIZADA. Verifique a pasta "figs/".\n');
 
 fprintf('\nSIMULAÇÃO FINALIZADA. Verifique a pasta "figs/".\n');
